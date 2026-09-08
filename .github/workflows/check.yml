@@ -13,5 +13,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: npm run build -- --out dist
+      # The Store invokes vici directly after npm ci, without npm prebuild.
+      - run: npx --no-install vici build --out dist
       - run: node scripts/check-build.mjs dist

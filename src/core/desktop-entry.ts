@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { join } from "node:path";
+import { privateLauncherDirectory, userDataDirectory } from "./launcher-paths";
 import type { AICommand } from "./types";
 
 export interface DesktopEntryOptions {
@@ -12,13 +12,11 @@ export interface DesktopEntryOptions {
 }
 
 export function applicationsDirectory(): string {
-  const dataHome = process.env.XDG_DATA_HOME;
-  return join(
-    dataHome && isAbsolute(dataHome)
-      ? dataHome
-      : join(homedir(), ".local", "share"),
-    "applications",
-  );
+  return join(privateLauncherDirectory(), "applications");
+}
+
+export function legacyApplicationsDirectory(): string {
+  return join(userDataDirectory(), "applications");
 }
 
 function field(value: string): string {
@@ -67,8 +65,26 @@ export function desktopEntryText(
     "Categories=Utility;",
     "Keywords=AI;Translate;Rewrite;Vicinae;",
     "X-Vicinae-AI-Commands=true",
+    "Actions=edit;",
+    "",
+    "[Desktop Action edit]",
+    "Name=Edit AI Command",
+    `Exec=${[options.executable, "cmd", "launch", options.entrypoint, command.id, "edit"].map(argument).join(" ")}`,
     "",
   ].join("\n");
+}
+
+export async function migrateDesktopEntry(
+  command: AICommand,
+  options: DesktopEntryOptions,
+  legacyDirectory: string,
+): Promise<void> {
+  await publishDesktopEntry(command, options);
+  if (legacyDirectory !== options.directory)
+    await removeDesktopEntry(command.id, {
+      ...options,
+      directory: legacyDirectory,
+    });
 }
 
 export async function publishDesktopEntry(
@@ -119,4 +135,52 @@ export async function removeDesktopEntry(
       "The main-search entry was replaced by another file. It has not been removed.",
     );
   await unlink(path);
+}
+
+export async function withDesktopEntriesRemoved<T>(
+  commandId: string,
+  options: DesktopEntryOptions[],
+  removeCommand: () => Promise<T>,
+): Promise<T> {
+  const snapshots: {
+    path: string;
+    content: string;
+    options: DesktopEntryOptions;
+  }[] = [];
+  for (const item of options) {
+    const path = desktopEntryPath(commandId, item);
+    if (snapshots.some((snapshot) => snapshot.path === path)) continue;
+    let content: string;
+    try {
+      content = await readFile(path, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw error;
+    }
+    if (!content.split("\n").includes("X-Vicinae-AI-Commands=true"))
+      throw new Error(
+        "A main-search entry was replaced by another file. Nothing has been removed.",
+      );
+    snapshots.push({ path, content, options: item });
+  }
+  const removed: typeof snapshots = [];
+  try {
+    for (const snapshot of snapshots) {
+      await removeDesktopEntry(commandId, snapshot.options);
+      removed.push(snapshot);
+    }
+    return await removeCommand();
+  } catch (error) {
+    const restored = await Promise.allSettled(
+      removed.map((snapshot) =>
+        writeFile(snapshot.path, snapshot.content, { flag: "wx", mode: 0o600 }),
+      ),
+    );
+    if (restored.some((result) => result.status === "rejected"))
+      throw new Error(
+        "Deletion failed and some launcher entries could not be restored. Use Repair Main Search Entry.",
+        { cause: error },
+      );
+    throw error;
+  }
 }

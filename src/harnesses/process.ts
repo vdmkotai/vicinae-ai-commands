@@ -3,11 +3,12 @@ import { access, mkdtemp, rm } from "node:fs/promises";
 import { constants } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { delimiter, isAbsolute, join } from "node:path";
-import type { HarnessId } from "../core/types";
+import type { CliId } from "../core/types";
+import { withoutPrivateLauncher } from "../core/launcher-paths";
 
 export function cleanEnvironment(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
-    ...process.env,
+    ...withoutPrivateLauncher(process.env),
     NO_COLOR: "1",
     TERM: "dumb",
   };
@@ -25,7 +26,7 @@ export function cleanEnvironment(): NodeJS.ProcessEnv {
 }
 
 export async function resolveExecutable(
-  harness: HarnessId | "vicinae",
+  harness: CliId | "vicinae",
   override?: string,
 ): Promise<string> {
   const candidates = override?.trim()
@@ -34,6 +35,9 @@ export async function resolveExecutable(
         join(homedir(), ".local", "bin", harness),
         ...(harness === "grok"
           ? [join(homedir(), ".grok", "bin", "grok")]
+          : []),
+        ...(harness === "opencode"
+          ? [join(homedir(), ".opencode", "bin", "opencode")]
           : []),
         ...(process.env.PATH ?? "")
           .split(delimiter)

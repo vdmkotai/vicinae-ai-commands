@@ -9,19 +9,22 @@ import {
 } from "@vicinae/api";
 import { useEffect, useState } from "react";
 import { HARNESS_NAMES, errorMessage, type AICommand } from "./core/types";
+import { launcherEnabled } from "./core/launcher-paths";
 import {
   captureSource,
   deleteCommand,
   publishCommand,
   quicklinkFor,
   repository,
+  synchronizeMainSearch,
   toastError,
   type SourceContext,
 } from "./vicinae";
-import { CommandForm } from "./ui/command-form";
+import { CommandForm, LAUNCHER_SETUP_URL } from "./ui/command-form";
 import { RunView } from "./ui/run-view";
 
 export default function AICommands() {
+  const rootSearchReady = process.platform === "linux" && launcherEnabled();
   const [commands, setCommands] = useState<AICommand[]>([]);
   const [context, setContext] = useState<SourceContext>();
   const [error, setError] = useState<string>();
@@ -32,7 +35,10 @@ export default function AICommands() {
   useEffect(() => {
     let active = true;
     void Promise.all([repository.commands(), captureSource()])
-      .then(([saved, source]) => {
+      .then(async ([saved, source]) => {
+        await synchronizeMainSearch(saved).catch((failure) =>
+          toastError(failure, "Some main-search entries need repair"),
+        );
         if (active) {
           setCommands(saved);
           setContext(source);
@@ -99,13 +105,18 @@ export default function AICommands() {
                   />
                 }
               />
-              {process.platform === "linux" ? (
+              {rootSearchReady ? (
                 <Action
                   title="Repair Main Search Entry"
                   icon={Icon.ArrowClockwise}
                   onAction={() =>
                     void publishCommand(command).catch(toastError)
                   }
+                />
+              ) : process.platform === "linux" ? (
+                <Action.OpenInBrowser
+                  title="Root Search Setup Instructions"
+                  url={LAUNCHER_SETUP_URL}
                 />
               ) : (
                 <Action.CreateQuicklink

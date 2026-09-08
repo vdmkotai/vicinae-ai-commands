@@ -2,10 +2,10 @@
   "$schema": "https://raw.githubusercontent.com/vicinaehq/vicinae/main/extra/schemas/extension.json",
   "name": "ai-commands",
   "title": "AI Commands",
-  "description": "Transform selected or copied text with your locally authenticated Claude Code, Codex, or Grok CLI. Prompts and input text are sent to the harness you choose.",
-  "version": "0.1.0",
+  "description": "Translate and rewrite selected or copied text with Claude Code, Codex, Grok, OpenCode, or direct APIs. Preview the result and press Enter to replace the selection. Individual root-search entries require separate local setup.",
+  "version": "0.3.0",
   "license": "MIT",
-  "author": "vdm",
+  "author": "vdmkotai",
   "icon": "icon.svg",
   "categories": [
     "Productivity"
@@ -16,7 +16,11 @@
     "rewrite",
     "claude",
     "codex",
-    "grok"
+    "grok",
+    "opencode",
+    "openai",
+    "anthropic",
+    "xai"
   ],
   "commands": [
     {
@@ -34,7 +38,7 @@
     {
       "name": "run-ai-command",
       "title": "Run AI Command",
-      "description": "Run a saved command from a Quicklink.",
+      "description": "Run or edit a saved command from its main-search entry.",
       "mode": "view",
       "arguments": [
         {
@@ -42,6 +46,12 @@
           "type": "text",
           "placeholder": "Command ID",
           "required": true
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "placeholder": "Action",
+          "required": false
         }
       ]
     },
@@ -54,7 +64,7 @@
     {
       "name": "check-harnesses",
       "title": "Check AI Harnesses",
-      "description": "Check CLI installation and available models.",
+      "description": "Check CLI availability, API connections, and model discovery.",
       "mode": "view"
     }
   ],
@@ -81,6 +91,34 @@
       "required": false
     },
     {
+      "name": "opencodePath",
+      "title": "OpenCode Executable",
+      "description": "Optional absolute path to OpenCode 1.18.29 or later. Uses its saved provider connections.",
+      "type": "textfield",
+      "required": false
+    },
+    {
+      "name": "openaiApiKey",
+      "title": "OpenAI API Key",
+      "description": "Optional. Used only when a command selects OpenAI API. API usage is billed by the provider.",
+      "type": "password",
+      "required": false
+    },
+    {
+      "name": "anthropicApiKey",
+      "title": "Anthropic API Key",
+      "description": "Optional. Used only when a command selects Anthropic API. API usage is billed by the provider.",
+      "type": "password",
+      "required": false
+    },
+    {
+      "name": "xaiApiKey",
+      "title": "xAI API Key",
+      "description": "Optional. Used only when a command selects xAI API. API usage is billed by the provider.",
+      "type": "password",
+      "required": false
+    },
+    {
       "name": "saveHistory",
       "title": "History",
       "label": "Save input and results locally",
@@ -98,8 +136,12 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
     "format": "prettier --write src test scripts package.json tsconfig.json '*.md'",
-    "check": "npm run typecheck && npm test",
-    "smoke": "tsx scripts/smoke.ts"
+    "check": "npm run lint && npm run typecheck && npm test",
+    "smoke": "tsx scripts/smoke.ts",
+    "postinstall": "node scripts/prepare-sdk.mjs",
+    "smoke:api": "tsx scripts/smoke-api.ts",
+    "setup:launcher": "tsx scripts/setup-launcher.ts",
+    "lint": "vici lint"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.263",
@@ -112,5 +154,16 @@
     "react": "^19.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.9.0"
-  }
+  },
+  "platforms": [
+    "Linux"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vdmkotai/vicinae-ai-commands.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vdmkotai/vicinae-ai-commands/issues"
+  },
+  "homepage": "https://github.com/vdmkotai/vicinae-ai-commands#readme"
 }

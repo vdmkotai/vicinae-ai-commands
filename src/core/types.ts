@@ -1,10 +1,27 @@
-export const HARNESS_IDS = ["claude", "codex", "grok"] as const;
+export const CLI_IDS = ["claude", "codex", "grok", "opencode"] as const;
+export const API_IDS = ["openai-api", "anthropic-api", "xai-api"] as const;
+export type CliId = (typeof CLI_IDS)[number];
+export type ApiId = (typeof API_IDS)[number];
+export const HARNESS_IDS = [...CLI_IDS, ...API_IDS] as const;
 export type HarnessId = (typeof HARNESS_IDS)[number];
 export const HARNESS_NAMES: Record<HarnessId, string> = {
   claude: "Claude Code",
   codex: "Codex",
   grok: "Grok",
+  opencode: "OpenCode",
+  "openai-api": "OpenAI API",
+  "anthropic-api": "Anthropic API",
+  "xai-api": "xAI API",
 };
+
+export function isApiHarness(harness: HarnessId): harness is ApiId {
+  return (API_IDS as readonly string[]).includes(harness);
+}
+
+export interface HarnessConnection {
+  executable: string;
+  apiKey?: string;
+}
 
 export interface AICommand {
   schemaVersion: 1;
@@ -26,6 +43,10 @@ export interface ModelInfo {
   efforts: string[];
   defaultEffort?: string;
   isDefault?: boolean;
+  effortInfo?: string;
+  maxOutputTokens?: number;
+  adaptiveThinking?: boolean;
+  budgetThinking?: boolean;
 }
 
 export interface InputSnapshot {
@@ -43,10 +64,9 @@ export interface HistoryEntry {
   result: string;
 }
 
-export interface RunRequest {
+export interface RunRequest extends HarnessConnection {
   command: AICommand;
   prompt: string;
-  executable: string;
   signal: AbortSignal;
   onText: (text: string) => void;
 }

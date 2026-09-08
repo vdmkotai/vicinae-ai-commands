@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 test("large valid plaintext results with many backticks render without exhausting the stack", () => {
   const value = "`a".repeat(200_000);
-  assert.equal(plainTextMarkdown(value), "```text\n" + value + "\n```");
+  assert.equal(plainTextMarkdown(value), "\\`a".repeat(200_000));
 });
 import { test } from "node:test";
 import {
@@ -76,9 +76,15 @@ test("result preview treats Markdown, HTML and fences as literal text", () => {
   const text =
     "![remote](https://example.com/pixel)\n```\n<script>bad()</script>\n````";
   const rendered = plainTextMarkdown(text);
-  assert.ok(rendered.startsWith("`````text\n"));
-  assert.ok(rendered.endsWith("\n`````"));
-  assert.ok(rendered.includes(text));
+  assert.ok(rendered.startsWith("\\!\\[remote\\]\\("));
+  assert.ok(rendered.includes("&lt;script&gt;bad\\(\\)&lt;/script&gt;"));
+  assert.ok(!rendered.includes("```"));
+  assert.ok(rendered.includes("  \n"));
+  assert.equal(plainTextMarkdown("hello\n===="), "hello  \n\\=\\=\\=\\=");
+  assert.equal(
+    plainTextMarkdown("# title\r\n    indented\n1. item &amp;"),
+    "\\# title  \n&#160;&#160;&#160;&#160;indented  \n1\\. item &amp;amp;",
+  );
 });
 
 test("refinement includes the original request and previous answer without changing snapshots", () => {

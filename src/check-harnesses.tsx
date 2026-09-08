@@ -11,12 +11,13 @@ import {
   HARNESS_IDS,
   HARNESS_NAMES,
   errorMessage,
+  isApiHarness,
   type HarnessId,
   type ModelInfo,
 } from "./core/types";
 import { plainTextMarkdown } from "./core/template";
 import { discoverModels } from "./harnesses";
-import { executableFor } from "./vicinae";
+import { connectionFor } from "./vicinae";
 
 type Status = { path?: string; models?: ModelInfo[]; error?: string };
 export default function CheckHarnesses() {
@@ -31,10 +32,14 @@ export default function CheckHarnesses() {
       void (async () => {
         let status: Status;
         try {
-          const path = await executableFor(harness);
+          const connection = await connectionFor(harness);
           status = {
-            path,
-            models: await discoverModels(harness, path, controller.signal),
+            path: connection.executable,
+            models: await discoverModels(
+              harness,
+              connection,
+              controller.signal,
+            ),
           };
         } catch (error) {
           status = { error: errorMessage(error) };
@@ -47,7 +52,7 @@ export default function CheckHarnesses() {
   return (
     <List
       navigationTitle="Check AI Harnesses"
-      isLoading={Object.keys(statuses).length < 3}
+      isLoading={Object.keys(statuses).length < HARNESS_IDS.length}
     >
       {HARNESS_IDS.map((harness) => {
         const status = statuses[harness];
@@ -59,7 +64,10 @@ export default function CheckHarnesses() {
         const markdown = status?.error
           ? plainTextMarkdown(status.error)
           : status?.models
-            ? `Executable: ${status.path}\n\n${status.models.map((model) => `- **${model.name}** — ${model.id}\n  Thinking: ${model.efforts.join(", ") || "harness default"}`).join("\n")}\n\nA model catalog check does not make a generation request. Sign in to the official CLI in your terminal if generation asks for authentication.`
+            ? plainTextMarkdown(
+                `${isApiHarness(harness) ? "Direct connection using the API key in extension preferences." : `Executable: ${status.path}`}\n\n${status.models.map((model) => `${model.name}
+Model ID: ${model.id}\nThinking: ${model.efforts.join(", ") || "provider default"}${model.effortInfo ? `\n${model.effortInfo}` : ""}`).join("\n\n")}\n\nA catalog check does not make a generation request. ${isApiHarness(harness) ? "Generation uses the provider's API billing." : "Connect or sign in to the CLI if generation asks for authentication."}`,
+              )
             : "Checking…";
         return (
           <List.Item

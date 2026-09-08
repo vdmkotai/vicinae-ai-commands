@@ -13,7 +13,7 @@ const api = {
   environment: {
     assetsPath: join(output, "assets"),
     supportPath: "/tmp/ai-commands",
-    ownerOrAuthorName: "vdm",
+    ownerOrAuthorName: "vdmkotai",
   },
   LocalStorage: {},
   Icon: {},

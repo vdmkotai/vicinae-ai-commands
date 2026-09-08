@@ -2,22 +2,22 @@ import { discoverModels, runHarness } from "../src/harnesses";
 import { resolveExecutable } from "../src/harnesses/process";
 import {
   DEFAULT_SYSTEM_PROMPT,
-  HARNESS_IDS,
+  CLI_IDS,
   errorMessage,
   type AICommand,
 } from "../src/core/types";
 
 async function main() {
   const requested = process.argv[2];
-  const ids = requested
-    ? HARNESS_IDS.filter((id) => id === requested)
-    : HARNESS_IDS;
+  const ids = requested ? CLI_IDS.filter((id) => id === requested) : CLI_IDS;
   if (!ids.length)
-    throw new Error("Usage: npm run smoke -- [claude|codex|grok] [--generate]");
+    throw new Error(
+      "Usage: npm run smoke -- [claude|codex|grok|opencode] [--generate]",
+    );
   for (const harness of ids) {
     try {
       const executable = await resolveExecutable(harness);
-      const models = await discoverModels(harness, executable);
+      const models = await discoverModels(harness, { executable });
       console.log(JSON.stringify({ harness, executable, models }, null, 2));
       if (process.argv.includes("--generate")) {
         const model = models.find((model) => model.isDefault) ?? models[0]!;

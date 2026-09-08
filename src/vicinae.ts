@@ -17,8 +17,10 @@ import { pathToFileURL } from "node:url";
 import { Repository } from "./core/repository";
 import {
   errorMessage,
+  isApiHarness,
   type AICommand,
   type HarnessId,
+  type HarnessConnection,
   type InputSnapshot,
 } from "./core/types";
 import { pasteResult } from "./core/paste";
@@ -26,9 +28,11 @@ import { resolveExecutable } from "./harnesses/process";
 import { setClaudeSdkLocation } from "./harnesses/claude";
 import {
   applicationsDirectory,
-  publishDesktopEntry,
-  removeDesktopEntry,
+  legacyApplicationsDirectory,
+  migrateDesktopEntry,
+  withDesktopEntriesRemoved,
 } from "./core/desktop-entry";
+import { launcherEnabled } from "./core/launcher-paths";
 
 setClaudeSdkLocation(
   pathToFileURL(join(environment.assetsPath, "claude-sdk.mjs")).href,
@@ -40,6 +44,10 @@ export interface Preferences {
   claudePath?: string;
   codexPath?: string;
   grokPath?: string;
+  opencodePath?: string;
+  openaiApiKey?: string;
+  anthropicApiKey?: string;
+  xaiApiKey?: string;
   saveHistory?: boolean;
 }
 export interface SourceContext {
@@ -49,11 +57,21 @@ export interface SourceContext {
   clipboardError?: string;
 }
 
-export function executableFor(harness: HarnessId): Promise<string> {
-  return resolveExecutable(
-    harness,
-    getPreferenceValues<Preferences>()[`${harness}Path`],
-  );
+export async function connectionFor(
+  harness: HarnessId,
+): Promise<HarnessConnection> {
+  const preferences = getPreferenceValues<Preferences>();
+  if (isApiHarness(harness)) {
+    const keyName = {
+      "openai-api": "openaiApiKey",
+      "anthropic-api": "anthropicApiKey",
+      "xai-api": "xaiApiKey",
+    } as const;
+    return { executable: "", apiKey: preferences[keyName[harness]] };
+  }
+  return {
+    executable: await resolveExecutable(harness, preferences[`${harness}Path`]),
+  };
 }
 
 export async function captureSource(): Promise<SourceContext> {
@@ -84,7 +102,7 @@ export async function captureSource(): Promise<SourceContext> {
 }
 
 export function quicklinkFor(command: AICommand) {
-  const author = encodeURIComponent(environment.ownerOrAuthorName || "vdm");
+  const author = encodeURIComponent(environment.ownerOrAuthorName || "vdmkotai");
   const extension = encodeURIComponent(
     basename(environment.supportPath) || environment.extensionName,
   );
@@ -102,7 +120,7 @@ export function quicklinkFor(command: AICommand) {
 async function desktopOptions() {
   return {
     directory: applicationsDirectory(),
-    entrypoint: `@${environment.ownerOrAuthorName || "vdm"}/${basename(environment.supportPath) || environment.extensionName}:run-ai-command`,
+    entrypoint: `@${environment.ownerOrAuthorName || "vdmkotai"}/${basename(environment.supportPath) || environment.extensionName}:run-ai-command`,
     executable: await resolveExecutable("vicinae"),
     icon: join(environment.assetsPath, "icon.svg"),
   };
@@ -113,18 +131,41 @@ export async function publishCommand(command: AICommand): Promise<void> {
     throw new Error(
       "Automatic main-search entries currently require Linux. Use Add Quicklink in the actions menu on other platforms.",
     );
-  await publishDesktopEntry(command, await desktopOptions());
+  if (!launcherEnabled())
+    throw new Error(
+      "Private launcher integration is not configured. Run npm run setup:launcher from the extension repository, then restart Vicinae.",
+    );
+  await migrateDesktopEntry(
+    command,
+    await desktopOptions(),
+    legacyApplicationsDirectory(),
+  );
+}
+
+export async function synchronizeMainSearch(
+  commands: AICommand[],
+): Promise<void> {
+  if (process.platform !== "linux" || !launcherEnabled()) return;
+  const failures: string[] = [];
+  for (const command of commands) {
+    try {
+      await publishCommand(command);
+    } catch (error) {
+      failures.push(`${command.name}: ${errorMessage(error)}`);
+    }
+  }
+  if (failures.length) throw new Error(failures.join("\n"));
 }
 
 export async function deleteCommand(command: AICommand): Promise<void> {
-  if (process.platform === "linux")
-    await removeDesktopEntry(command.id, await desktopOptions());
-  try {
-    await repository.deleteCommand(command.id);
-  } catch (error) {
-    if (process.platform === "linux") await publishCommand(command);
-    throw error;
-  }
+  if (process.platform === "linux") {
+    const options = await desktopOptions();
+    await withDesktopEntriesRemoved(
+      command.id,
+      [options, { ...options, directory: legacyApplicationsDirectory() }],
+      () => repository.deleteCommand(command.id),
+    );
+  } else await repository.deleteCommand(command.id);
 }
 
 let pasteInFlight = false;

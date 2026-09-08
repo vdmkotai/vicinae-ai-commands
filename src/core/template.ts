@@ -37,11 +37,18 @@ export function renderTemplate(template: string, input: InputSnapshot): string {
 }
 
 export function plainTextMarkdown(text: string): string {
-  let longestFence = 2;
-  for (const match of text.matchAll(/`+/g))
-    longestFence = Math.max(longestFence, match[0].length);
-  const fence = "`".repeat(longestFence + 1);
-  return `${fence}text\n${text}\n${fence}`;
+  // Vicinae wraps paragraphs, but not fenced code blocks. Escape both Markdown
+  // and HTML so model output remains literal and cannot load remote images.
+  // This representation is only for display; copy/paste always uses raw text.
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/[\\`*_{}\[\]()#+=.!|~\-]/g, "\\$&")
+    .replace(/^[ \t]+/gm, (indent) =>
+      indent.replace(/ /g, "&#160;").replace(/\t/g, "&#160;&#160;&#160;&#160;"),
+    )
+    .replace(/\r\n|\r|\n/g, "  \n");
 }
 
 export function refinementPrompt(

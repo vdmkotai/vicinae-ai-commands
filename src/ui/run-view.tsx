@@ -25,7 +25,7 @@ import {
 } from "../core/template";
 import { runHarness } from "../harnesses";
 import {
-  executableFor,
+  connectionFor,
   pasteToSource,
   repository,
   toastError,
@@ -74,12 +74,12 @@ export function RunView({
         if (!basePrompt.current)
           basePrompt.current = renderTemplate(command.prompt, context.input);
         const prompt = execution.prompt || basePrompt.current;
-        const executable = await executableFor(command.harness);
+        const connection = await connectionFor(command.harness);
         if (active.signal.aborted) return;
         const result = await runHarness({
           command,
           prompt,
-          executable,
+          ...connection,
           signal: active.signal,
           onText: (text) => {
             if (!active.signal.aborted) setState({ status: "loading", text });

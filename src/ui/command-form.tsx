@@ -21,13 +21,18 @@ import {
   type ModelInfo,
 } from "../core/types";
 import { discoverModels } from "../harnesses";
+import { launcherEnabled } from "../core/launcher-paths";
+import { plainTextMarkdown } from "../core/template";
 import {
-  executableFor,
+  connectionFor,
   publishCommand,
   quicklinkFor,
   repository,
   toastError,
 } from "../vicinae";
+
+export const LAUNCHER_SETUP_URL =
+  "https://github.com/vdmkotai/vicinae-ai-commands#desktop-integration";
 
 export function CommandForm({
   command,
@@ -43,6 +48,7 @@ export function CommandForm({
     command?.prompt ??
     "Translate into English. Return only the translated text.\n\n{selection}";
   const systemPrompt = command?.systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
+  const rootSearchReady = process.platform === "linux" && launcherEnabled();
   const [harness, setHarness] = useState<HarnessId>(
     command?.harness ?? "claude",
   );
@@ -77,7 +83,7 @@ export function CommandForm({
       try {
         const found = await discoverModels(
           harness,
-          await executableFor(harness),
+          await connectionFor(harness),
           controller.signal,
         );
         if (controller.signal.aborted) return;
@@ -141,15 +147,21 @@ export function CommandForm({
       );
       persistedCommand.current = result;
       let publicationError: string | undefined;
-      try {
-        await publishCommand(result);
-      } catch (error) {
-        publicationError = errorMessage(error);
+      if (rootSearchReady) {
+        try {
+          await publishCommand(result);
+        } catch (error) {
+          publicationError = errorMessage(error);
+        }
       }
       onSave?.(result);
-      if (publicationError)
+      if (publicationError || !rootSearchReady)
         push(
-          <SavedCommand command={result} publicationError={publicationError} />,
+          <SavedCommand
+            command={result}
+            publicationError={publicationError}
+            needsSetup={!rootSearchReady}
+          />,
         );
       else {
         await showToast({
@@ -190,9 +202,21 @@ export function CommandForm({
             icon={Icon.Cog}
             onAction={openExtensionPreferences}
           />
+          {!rootSearchReady && (
+            <Action.OpenInBrowser
+              title="Root Search Setup Instructions"
+              url={LAUNCHER_SETUP_URL}
+            />
+          )}
         </ActionPanel>
       }
     >
+      {!rootSearchReady && (
+        <Form.Description
+          title="Root search"
+          text="Saved commands run from AI Commands. To show each command directly in root search, complete the separate desktop setup in the README."
+        />
+      )}
       <Form.TextField
         id="name"
         title="Name"
@@ -204,7 +228,7 @@ export function CommandForm({
       />
       <Form.Dropdown
         id="harness"
-        title="Harness"
+        title="Harness / API"
         value={harness}
         onChange={(value) => {
           setHarness(value as HarnessId);
@@ -254,12 +278,13 @@ export function CommandForm({
         }}
         error={errors.effort}
         info={
-          !loading && !efforts.length
+          selectedModel?.effortInfo ??
+          (!loading && !efforts.length
             ? "This model does not expose configurable thinking levels."
-            : undefined
+            : undefined)
         }
       >
-        <Form.Dropdown.Item value="" title="Harness default" />
+        <Form.Dropdown.Item value="" title="Provider default" />
         {effort && !efforts.includes(effort) && (
           <Form.Dropdown.Item
             value={effort}
@@ -295,18 +320,31 @@ export function CommandForm({
 function SavedCommand({
   command,
   publicationError,
+  needsSetup,
 }: {
   command: AICommand;
   publicationError?: string;
+  needsSetup: boolean;
 }) {
   const [error, setError] = useState(publicationError);
+  const message = needsSetup
+    ? "Your command is saved. Run it from AI Commands. To give it its own root-search entry, follow the desktop setup instructions, restart Vicinae, and open AI Commands once."
+    : error
+      ? `Your command is saved, but its root-search entry could not be updated. Fix the problem below, then retry.\n\n${error}`
+      : "Find this command by name in root search. Select text in an app, run the command, and press Enter to paste the result.";
   return (
     <Detail
       navigationTitle="Command Saved"
-      markdown={`# ${command.name.replace(/[\\`*_[\]<>]/g, "\\$&")}\n\n${error ? `The command is saved, but its main-search entry could not be created. Retry adding it.\n\n${error.replace(/[\\`*_[\]<>]/g, "\\$&")}` : "Ready. Find this command by its name directly in Vicinae's main search. Select text in any app, run the command, then press Enter to paste the result."}`}
+      markdown={plainTextMarkdown(`${command.name}\n\n${message}`)}
       actions={
         <ActionPanel>
-          {error ? (
+          {needsSetup && (
+            <Action.OpenInBrowser
+              title="Root Search Setup Instructions"
+              url={LAUNCHER_SETUP_URL}
+            />
+          )}
+          {error && !needsSetup ? (
             <Action
               title="Retry Adding to Main Search"
               icon={Icon.ArrowClockwise}
