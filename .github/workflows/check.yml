@@ -16,3 +16,4 @@ jobs:
       # The Store invokes vici directly after npm ci, without npm prebuild.
       - run: npx --no-install vici build --out dist
       - run: node scripts/check-build.mjs dist
+      - run: node scripts/check-setup-ui.mjs dist
