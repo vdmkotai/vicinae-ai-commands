@@ -1,0 +1,116 @@
+{
+  "$schema": "https://raw.githubusercontent.com/vicinaehq/vicinae/main/extra/schemas/extension.json",
+  "name": "ai-commands",
+  "title": "AI Commands",
+  "description": "Transform selected or copied text with your locally authenticated Claude Code, Codex, or Grok CLI. Prompts and input text are sent to the harness you choose.",
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": "vdm",
+  "icon": "icon.svg",
+  "categories": [
+    "Productivity"
+  ],
+  "keywords": [
+    "ai",
+    "translate",
+    "rewrite",
+    "claude",
+    "codex",
+    "grok"
+  ],
+  "commands": [
+    {
+      "name": "create-ai-command",
+      "title": "Create AI Command",
+      "description": "Save a reusable text transformation.",
+      "mode": "view"
+    },
+    {
+      "name": "ai-commands",
+      "title": "AI Commands",
+      "description": "Run and manage your saved AI commands.",
+      "mode": "view"
+    },
+    {
+      "name": "run-ai-command",
+      "title": "Run AI Command",
+      "description": "Run a saved command from a Quicklink.",
+      "mode": "view",
+      "arguments": [
+        {
+          "name": "commandId",
+          "type": "text",
+          "placeholder": "Command ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "ai-command-history",
+      "title": "AI Command History",
+      "description": "Browse and clear locally saved results.",
+      "mode": "view"
+    },
+    {
+      "name": "check-harnesses",
+      "title": "Check AI Harnesses",
+      "description": "Check CLI installation and available models.",
+      "mode": "view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "claudePath",
+      "title": "Claude Executable",
+      "description": "Optional absolute path to the installed Claude Code CLI. Otherwise detected automatically.",
+      "type": "textfield",
+      "required": false
+    },
+    {
+      "name": "codexPath",
+      "title": "Codex Executable",
+      "description": "Optional absolute path to the installed Codex CLI.",
+      "type": "textfield",
+      "required": false
+    },
+    {
+      "name": "grokPath",
+      "title": "Grok Executable",
+      "description": "Optional absolute path to the installed Grok CLI.",
+      "type": "textfield",
+      "required": false
+    },
+    {
+      "name": "saveHistory",
+      "title": "History",
+      "label": "Save input and results locally",
+      "description": "Keep up to 100 completed runs. You can clear them in AI Command History.",
+      "type": "checkbox",
+      "default": true,
+      "required": false
+    }
+  ],
+  "scripts": {
+    "predev": "node scripts/prepare-sdk.mjs",
+    "dev": "vici develop",
+    "prebuild": "node scripts/prepare-sdk.mjs",
+    "build": "vici build",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "format": "prettier --write src test scripts package.json tsconfig.json '*.md'",
+    "check": "npm run typecheck && npm test",
+    "smoke": "tsx scripts/smoke.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.263",
+    "@vicinae/api": "0.28.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "prettier": "^3.0.0",
+    "react": "^19.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.9.0"
+  }
+}
